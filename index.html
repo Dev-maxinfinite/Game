@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="High-speed JavaScript Racing Game with custom physics">
     <meta name="keywords" content="racing game, JavaScript game, portfolio project, game development">
-    <meta name="author" content="Your Name">
+    <meta name="author" content="Dev Sharan">
     <title>Neon Racer | JavaScript Racing Game</title>
     <style>
         :root {
@@ -176,26 +176,6 @@
     </div>
 
     <script>
-        // Game State
-        const game = {
-            playerX: 50,
-            playerSpeed: 0,
-            maxSpeed: 5,
-            acceleration: 0.1,
-            score: 0,
-            gameActive: false,
-            roadLines: [],
-            enemies: [],
-            lastEnemyTime: 0,
-            enemyInterval: 1500,
-            roadSpeed: 3,
-            keys: {
-                left: false,
-                right: false
-            }
-        };
-
-        // DOM Elements
         const road = document.getElementById('road');
         const playerCar = document.getElementById('player-car');
         const scoreDisplay = document.getElementById('score-display');
@@ -205,60 +185,56 @@
         const startBtn = document.getElementById('start-btn');
         const restartBtn = document.getElementById('restart-btn');
 
-        // Event Listeners
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowLeft') game.keys.left = true;
-            if (e.key === 'ArrowRight') game.keys.right = true;
-        });
+        const game = {
+            playerX: 0,
+            score: 0,
+            enemies: [],
+            keys: { left: false, right: false },
+            lastEnemyTime: 0,
+            enemyInterval: 1500,
+            roadSpeed: 3,
+            gameActive: false
+        };
 
-        document.addEventListener('keyup', (e) => {
-            if (e.key === 'ArrowLeft') game.keys.left = false;
-            if (e.key === 'ArrowRight') game.keys.right = false;
-        });
+        function startGame() {
+            game.score = 0;
+            game.enemies = [];
+            game.enemyInterval = 1500;
+            game.roadSpeed = 3;
+            game.gameActive = true;
+            game.playerX = road.offsetWidth / 2 - playerCar.offsetWidth / 2;
+            document.querySelectorAll('.enemy-car, .road-line').forEach(el => el.remove());
+            gameOverScreen.style.display = 'none';
+            startScreen.style.display = 'none';
+            gameLoop();
+        }
 
-        startBtn.addEventListener('click', startGame);
-        restartBtn.addEventListener('click', startGame);
-
-        // Game Loop
         function gameLoop() {
             if (!game.gameActive) return;
-
-            updatePlayer();
-            updateRoad();
+            handleInput();
+            moveRoad();
             spawnEnemies();
-            updateEnemies();
-            checkCollisions();
+            moveEnemies();
+            checkCollision();
             updateScore();
-
             requestAnimationFrame(gameLoop);
         }
 
-        function updatePlayer() {
-            // Handle movement
+        function handleInput() {
             if (game.keys.left) game.playerX -= 5;
             if (game.keys.right) game.playerX += 5;
-
-            // Boundary checks
             const roadWidth = road.offsetWidth;
             const carWidth = playerCar.offsetWidth;
             game.playerX = Math.max(0, Math.min(roadWidth - carWidth, game.playerX));
-
             playerCar.style.left = `${game.playerX}px`;
         }
 
-        function updateRoad() {
-            // Move road lines (illusion of movement)
-            const lines = document.querySelectorAll('.road-line');
-            lines.forEach(line => {
-                const currentTop = parseInt(line.style.top || '0');
-                line.style.top = `${currentTop + game.roadSpeed}px`;
-
-                if (currentTop > road.offsetHeight) {
-                    line.remove();
-                }
+        function moveRoad() {
+            document.querySelectorAll('.road-line').forEach(line => {
+                const top = parseInt(line.style.top || '0');
+                line.style.top = `${top + game.roadSpeed}px`;
+                if (top > road.offsetHeight) line.remove();
             });
-
-            // Spawn new road lines
             if (Math.random() < 0.05) {
                 const line = document.createElement('div');
                 line.className = 'road-line';
@@ -278,40 +254,35 @@
                 road.appendChild(enemy);
                 game.enemies.push(enemy);
                 game.lastEnemyTime = now;
-
-                // Increase difficulty
                 game.enemyInterval = Math.max(500, game.enemyInterval - 10);
                 game.roadSpeed = Math.min(10, game.roadSpeed + 0.1);
             }
         }
 
-        function updateEnemies() {
-            game.enemies.forEach((enemy, index) => {
-                const currentTop = parseInt(enemy.style.top);
-                enemy.style.top = `${currentTop + game.roadSpeed}px`;
-
-                // Remove if off-screen
-                if (currentTop > road.offsetHeight) {
+        function moveEnemies() {
+            game.enemies = game.enemies.filter(enemy => {
+                const top = parseInt(enemy.style.top || '0');
+                enemy.style.top = `${top + game.roadSpeed}px`;
+                if (top > road.offsetHeight) {
                     enemy.remove();
-                    game.enemies.splice(index, 1);
                     game.score += 10;
+                    return false;
                 }
+                return true;
             });
         }
 
-        function checkCollisions() {
+        function checkCollision() {
             const playerRect = playerCar.getBoundingClientRect();
-            
             for (const enemy of game.enemies) {
-                const enemyRect = enemy.getBoundingClientRect();
-                
+                const rect = enemy.getBoundingClientRect();
                 if (
-                    playerRect.left < enemyRect.right &&
-                    playerRect.right > enemyRect.left &&
-                    playerRect.top < enemyRect.bottom &&
-                    playerRect.bottom > enemyRect.top
+                    playerRect.left < rect.right &&
+                    playerRect.right > rect.left &&
+                    playerRect.top < rect.bottom &&
+                    playerRect.bottom > rect.top
                 ) {
-                    endGame();
+                    gameOver();
                     break;
                 }
             }
@@ -322,31 +293,24 @@
             scoreDisplay.textContent = `Score: ${game.score}`;
         }
 
-        function startGame() {
-            // Reset game state
-            game.score = 0;
-            game.playerX = road.offsetWidth / 2 - 25;
-            game.enemies = [];
-            game.roadSpeed = 3;
-            game.enemyInterval = 1500;
-            game.gameActive = true;
-
-            // Clear existing elements
-            document.querySelectorAll('.enemy-car, .road-line').forEach(el => el.remove());
-
-            // Hide screens
-            gameOverScreen.style.display = 'none';
-            startScreen.style.display = 'none';
-
-            // Start game loop
-            gameLoop();
-        }
-
-        function endGame() {
+        function gameOver() {
             game.gameActive = false;
             finalScoreDisplay.textContent = `Score: ${game.score}`;
             gameOverScreen.style.display = 'block';
         }
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'ArrowLeft' || e.key === 'a') game.keys.left = true;
+            if (e.key === 'ArrowRight' || e.key === 'd') game.keys.right = true;
+        });
+
+        document.addEventListener('keyup', e => {
+            if (e.key === 'ArrowLeft' || e.key === 'a') game.keys.left = false;
+            if (e.key === 'ArrowRight' || e.key === 'd') game.keys.right = false;
+        });
+
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', startGame);
     </script>
 </body>
 </html>
